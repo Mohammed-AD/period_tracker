@@ -1,0 +1,24 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="petalPink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F4AFC8"/>
+      <stop offset="100%" stop-color="#E8A0BF"/>
+    </linearGradient>
+    <linearGradient id="petalLav" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C7B6E8"/>
+      <stop offset="100%" stop-color="#B9A6DD"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="220" fill="#FFF1F5"/>
+
+  <g transform="translate(512,512)">
+    <g transform="rotate(0)"><ellipse cx="0" cy="-185" rx="83" ry="147" fill="url(#petalPink)"/></g>
+    <g transform="rotate(72)"><ellipse cx="0" cy="-185" rx="83" ry="147" fill="url(#petalLav)"/></g>
+    <g transform="rotate(144)"><ellipse cx="0" cy="-185" rx="83" ry="147" fill="url(#petalPink)"/></g>
+    <g transform="rotate(216)"><ellipse cx="0" cy="-185" rx="83" ry="147" fill="url(#petalLav)"/></g>
+    <g transform="rotate(288)"><ellipse cx="0" cy="-185" rx="83" ry="147" fill="url(#petalPink)"/></g>
+    <circle cx="0" cy="0" r="83" fill="#E8607F"/>
+    <path d="M -25 -13 C -25 -45, 25 -45, 25 -13 C 25 19, 0 45, 0 45 C 0 45, -25 19, -25 -13 Z" fill="#FFF1F5"/>
+  </g>
+</svg>

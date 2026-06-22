@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "989766721878",
+    "project_id": "bloom-period-tracker-89849",
+    "storage_bucket": "bloom-period-tracker-89849.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:989766721878:android:d0d062a669f921f60676f7",
+        "android_client_info": {
+          "package_name": "com.company.bloomperiodtracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsHZeJkrRUFZg0-ocWJDiphgbPw9Xjc4k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:989766721878:android:b679152155c114f70676f7",
+        "android_client_info": {
+          "package_name": "com.example.bloom_cycle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsHZeJkrRUFZg0-ocWJDiphgbPw9Xjc4k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

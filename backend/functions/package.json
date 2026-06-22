@@ -1,0 +1,14 @@
+{
+  "name": "bloom-chat-proxy",
+  "description": "Gemini chat proxy for the Bloom period tracker app",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-functions": "^5.0.0",
+    "firebase-admin": "^12.0.0",
+    "node-fetch": "^2.7.0"
+  },
+  "private": true
+}
