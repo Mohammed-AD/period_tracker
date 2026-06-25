@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/cycle_entry.dart';
 import '../../services/cycle_repository.dart';
+import '../../services/reminder_scheduler.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/flow_intensity_selector.dart';
+import '../../widgets/mood_emoji_selector.dart';
+import '../../widgets/success_overlay.dart';
 
 class LogEntryScreen extends StatefulWidget {
   final DateTime initialDate;
@@ -69,19 +74,93 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
     entry.symptoms = _symptoms.toList();
     entry.notes = _notesController.text.trim().isEmpty ? null : _notesController.text.trim();
 
-    if (widget.existingEntry != null) {
-      await CycleRepository.updateEntry(entry);
-    } else {
-      await CycleRepository.addEntry(entry);
+    try {
+      if (widget.existingEntry != null) {
+        await CycleRepository.updateEntry(entry);
+      } else {
+        await CycleRepository.addEntry(entry);
+      }
+    } catch (e) {
+      // The actual save failed — this one we DO surface, since silently
+      // doing nothing here is exactly the bug we're fixing.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save: $e')),
+        );
+      }
+      return;
     }
 
+    HapticFeedback.mediumImpact();
+    // Reminder scheduling is a side effect of saving, not a precondition —
+    // see _rescheduleReminders for why this can never block the save above.
+    await _rescheduleReminders();
+
+    if (mounted) await SuccessOverlay.show(context, message: 'Period logged!');
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  /// A new/edited period entry shifts the predicted next period and
+  /// ovulation date, so any already-scheduled reminders need to move with
+  /// it. Wrapped in try/catch deliberately: scheduling a reminder is a
+  /// side effect of saving, never a precondition for it. If the OS
+  /// declines to schedule a notification (missing permission, OEM battery
+  /// restrictions, etc.) that must never block or roll back the entry
+  /// that was already saved successfully.
+  Future<void> _rescheduleReminders() async {
+    try {
+      final entries = CycleRepository.getAllEntries();
+      await ReminderScheduler.rescheduleAll(entries);
+    } catch (e) {
+      debugPrint('Reminder scheduling failed (non-fatal): $e');
+    }
   }
 
   Future<void> _delete() async {
     if (widget.existingEntry == null) return;
-    await CycleRepository.deleteEntry(widget.existingEntry!.id);
+    final confirmed = await _confirm(
+      title: 'Delete this entry?',
+      message: 'This period entry will be permanently removed. This can\'t be undone.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed) return;
+
+    try {
+      await CycleRepository.deleteEntry(widget.existingEntry!.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete: $e')),
+        );
+      }
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    await _rescheduleReminders();
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  /// Small reusable yes/no confirmation dialog for destructive actions —
+  /// keeps a single consistent look instead of writing showDialog
+  /// boilerplate inline.
+  Future<bool> _confirm({required String title, required String message, required String confirmLabel}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(confirmLabel, style: TextStyle(color: AppColors.concern, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
@@ -94,6 +173,7 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
           if (widget.existingEntry != null)
             IconButton(
               icon: Icon(Icons.delete_outline_rounded, color: AppColors.concern),
+              tooltip: 'Delete entry',
               onPressed: _delete,
             ),
         ],
@@ -112,19 +192,9 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
           ),
           const SizedBox(height: 24),
           _sectionTitle('Flow'),
-          Wrap(
-            spacing: 8,
-            children: FlowOptions.all.map((f) {
-              final selected = _flow == f;
-              return ChoiceChip(
-                label: Text(f),
-                selected: selected,
-                onSelected: (_) => setState(() => _flow = f),
-                selectedColor: AppColors.primary,
-                backgroundColor: AppColors.cardBackground,
-                labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textPrimary),
-              );
-            }).toList(),
+          FlowIntensitySelector(
+            selected: _flow,
+            onChanged: (f) => setState(() => _flow = f),
           ),
           const SizedBox(height: 24),
           _sectionTitle('Symptoms'),
@@ -148,19 +218,9 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
           ),
           const SizedBox(height: 24),
           _sectionTitle('Mood'),
-          Wrap(
-            spacing: 8,
-            children: MoodOptions.all.map((m) {
-              final selected = _mood == m;
-              return ChoiceChip(
-                label: Text(m),
-                selected: selected,
-                onSelected: (_) => setState(() => _mood = selected ? null : m),
-                selectedColor: AppColors.accent,
-                backgroundColor: AppColors.cardBackground,
-                labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textPrimary),
-              );
-            }).toList(),
+          MoodEmojiSelector(
+            selected: _mood,
+            onChanged: (m) => setState(() => _mood = m),
           ),
           const SizedBox(height: 24),
           _sectionTitle('Notes'),

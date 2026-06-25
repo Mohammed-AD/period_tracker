@@ -28,6 +28,19 @@ class _SetPinScreenState extends State<SetPinScreen> {
     } else {
       if (pin == _firstPin) {
         await AuthService.setPin(pin);
+
+        // If this is a PIN change (not initial setup), just go back with
+        // a success message — no need to re-navigate to HomeScreen.
+        if (!widget.isInitialSetup) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('PIN changed successfully!')),
+            );
+            Navigator.of(context).pop();
+          }
+          return;
+        }
+
         final settings = CycleRepository.getSettings();
         settings.lockEnabled = true;
         await CycleRepository.saveSettings(settings);
@@ -92,6 +105,9 @@ class _SetPinScreenState extends State<SetPinScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: widget.isInitialSetup
+          ? null
+          : AppBar(title: const Text('Change PIN')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -101,13 +117,19 @@ class _SetPinScreenState extends State<SetPinScreen> {
               Icon(Icons.lock_rounded, size: 48, color: AppColors.primary),
               const SizedBox(height: 24),
               Text(
-                _confirming ? 'Confirm your PIN' : 'Create a PIN to secure your data',
+                _confirming
+                    ? 'Confirm your new PIN'
+                    : (widget.isInitialSetup
+                        ? 'Create a PIN to secure your data'
+                        : 'Enter your new PIN'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
-                'Only you will be able to open this app.',
+                widget.isInitialSetup
+                    ? 'Only you will be able to open this app.'
+                    : 'Your new PIN will be used to unlock the app.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
               ),

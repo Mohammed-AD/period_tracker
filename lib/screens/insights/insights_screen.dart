@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../services/cycle_repository.dart';
 import '../../services/cycle_analyzer.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/glass_card.dart';
 
 class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key});
@@ -69,6 +70,8 @@ class InsightsScreenState extends State<InsightsScreen> {
               const SizedBox(height: 20),
               _buildCycleChart(),
               const SizedBox(height: 20),
+              _buildPeriodLengthBarChart(),
+              const SizedBox(height: 20),
             ],
             if (insight.details.isNotEmpty) _buildDetailsCard(insight),
             const SizedBox(height: 16),
@@ -82,17 +85,9 @@ class InsightsScreenState extends State<InsightsScreen> {
   }
 
   Widget _buildStatusCard(HealthInsight insight, Color color) {
-    return Container(
+    return GlassCard(
+      gradientColors: [color.withOpacity(0.22), color.withOpacity(0.06)],
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.15), color.withOpacity(0.05)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -175,6 +170,76 @@ class InsightsScreenState extends State<InsightsScreen> {
                     dotData: const FlDotData(show: true),
                     belowBarData: BarAreaData(show: true, color: AppColors.primaryLight.withOpacity(0.5)),
                   ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodLengthBarChart() {
+    final lengths = _analyzer.periodLengths;
+    if (lengths.length < 2) return const SizedBox.shrink();
+
+    // Most recent few periods read clearer as bars than the whole history.
+    final recent = lengths.length > 8 ? lengths.sublist(lengths.length - 8) : lengths;
+    final maxLength = recent.reduce((a, b) => a > b ? a : b).toDouble();
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 20, 20, 12),
+      height: 200,
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: [
+        BoxShadow(color: AppColors.shadow, blurRadius: 16, offset: const Offset(0, 6)),
+      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 8),
+            child: Text('Period Length History', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                maxY: maxLength + 2,
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 20,
+                      getTitlesWidget: (value, meta) {
+                        final indexFromEnd = recent.length - value.toInt();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            indexFromEnd == 1 ? 'Latest' : '-${indexFromEnd - 1}',
+                            style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: [
+                  for (int i = 0; i < recent.length; i++)
+                    BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: recent[i].toDouble(),
+                          color: AppColors.periodColor,
+                          width: 16,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import '../../services/auth_service.dart';
-import '../../services/cycle_repository.dart';
-import '../../theme/app_theme.dart';
-import '../onboarding/onboarding_screen.dart';
+import 'package:bloom_cycle/services/auth_service.dart';
+import 'package:bloom_cycle/services/cycle_repository.dart';
+import 'package:bloom_cycle/theme/app_theme.dart';
+import 'package:bloom_cycle/screens/onboarding/onboarding_screen.dart';
 
-/// First-run "account creation" screen. Fully local — there is no server,
-/// this just sets the person's display name and a 4-digit PIN that will be
-/// required on every future app open (see LoginScreen).
+/// First-run setup screen. Fully local — there is no server.
+/// Sets the person's display name and a 4-digit PIN.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -66,12 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Save name + PIN, then move on to cycle-setup onboarding. Email is
-    // no longer collected at registration (it added friction and the
-    // OTP-recovery backend isn't set up out of the box) — a recovery
-    // email can still be added later from Edit Profile if desired, and
-    // "Forgot PIN" simply falls back to its erase-and-reset path when
-    // no email is on file.
+    // Save name + PIN, then move on to cycle-setup onboarding.
     await AuthService.setPin(pin);
     final settings = CycleRepository.getSettings();
     settings.userName = _nameController.text.trim().isEmpty
@@ -124,7 +118,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           controller: _nameController,
           decoration: const InputDecoration(hintText: 'Your name (optional)'),
           textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _proceedToPin(),
         ),
         const SizedBox(height: 32),
         SizedBox(
@@ -152,7 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'You\'ll use this to unlock the app every time.',
+          'You\'ll use this to unlock the app every time.\nForgot your PIN? Use biometric to log in, then change it from Profile.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
         ),

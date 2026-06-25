@@ -2,14 +2,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/user_settings.dart';
-import '../../services/cycle_repository.dart';
-import '../../services/auth_service.dart';
-import '../../services/notification_service.dart';
-import '../../services/reminder_scheduler.dart';
-import '../../theme/app_theme.dart';
-import '../log_entry/log_entry_screen.dart';
-import '../profile/edit_profile_screen.dart';
+import 'package:bloom_cycle/models/user_settings.dart';
+import 'package:bloom_cycle/services/cycle_repository.dart';
+import 'package:bloom_cycle/services/auth_service.dart';
+import 'package:bloom_cycle/theme/app_theme.dart';
+import 'package:bloom_cycle/screens/lock/change_pin_screen.dart';
+import 'package:bloom_cycle/screens/log_entry/log_entry_screen.dart';
+import 'package:bloom_cycle/screens/profile/edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -59,6 +58,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await CycleRepository.saveSettings(_settings);
   }
 
+  Future<void> _openChangePinScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChangePinScreen()),
+    );
+  }
+
   Future<void> _toggleBiometric(bool value) async {
     if (value) {
       final available = await AuthService.canCheckBiometrics();
@@ -72,51 +77,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
     setState(() => _settings.biometricEnabled = value);
-    await CycleRepository.saveSettings(_settings);
-  }
-
-  Future<void> _rescheduleReminders() async {
-    final entries = CycleRepository.getAllEntries();
-    await ReminderScheduler.rescheduleAll(entries);
-  }
-
-  /// Master "Reminders" switch. Turning it on asks for OS notification
-  /// permission once (if not already granted) — without that, every
-  /// individual reminder toggle below would silently do nothing.
-  Future<void> _toggleReminders(bool value) async {
-    if (value) {
-      final granted = await NotificationService.requestPermission();
-      if (!granted && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enable notifications for Bloom in your device settings to use reminders.')),
-        );
-      }
-    }
-    setState(() => _settings.remindersEnabled = value);
-    await CycleRepository.saveSettings(_settings);
-    await _rescheduleReminders();
-  }
-
-  Future<void> _togglePeriodReminder(bool value) async {
-    setState(() => _settings.periodReminderEnabled = value);
-    await CycleRepository.saveSettings(_settings);
-    await _rescheduleReminders();
-  }
-
-  Future<void> _toggleOvulationReminder(bool value) async {
-    setState(() => _settings.ovulationReminderEnabled = value);
-    await CycleRepository.saveSettings(_settings);
-    await _rescheduleReminders();
-  }
-
-  Future<void> _toggleWaterReminder(bool value) async {
-    setState(() => _settings.waterReminderEnabled = value);
-    await CycleRepository.saveSettings(_settings);
-    await _rescheduleReminders();
-  }
-
-  Future<void> _adjustWaterGoal(int deltaMl) async {
-    setState(() => _settings.waterGoalMl = (_settings.waterGoalMl + deltaMl).clamp(500, 5000).toInt());
     await CycleRepository.saveSettings(_settings);
   }
 
@@ -138,37 +98,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _sectionTitle('Security'),
           _buildSwitchTile('App lock', _settings.lockEnabled, _toggleLock, Icons.lock_outline_rounded),
           _buildSwitchTile('Biometric unlock', _settings.biometricEnabled, _toggleBiometric, Icons.fingerprint_rounded),
+          _buildNavTile('Change PIN', Icons.lock_reset_rounded, _openChangePinScreen),
           const SizedBox(height: 20),
           _sectionTitle('Cycle Settings'),
           _buildInfoTile('Average cycle length', '${_settings.averageCycleLength} days', Icons.refresh_rounded),
           _buildInfoTile('Average period length', '${_settings.averagePeriodLength} days', Icons.water_drop_outlined),
-          const SizedBox(height: 20),
-          _sectionTitle('Reminders'),
-          _buildSwitchTile('Reminders', _settings.remindersEnabled, _toggleReminders, Icons.notifications_outlined),
-          if (_settings.remindersEnabled) ...[
-            _buildSwitchTile(
-              'Period reminder (2 days before)',
-              _settings.periodReminderEnabled,
-              _togglePeriodReminder,
-              Icons.calendar_today_rounded,
-              indent: true,
-            ),
-            _buildSwitchTile(
-              'Ovulation reminder',
-              _settings.ovulationReminderEnabled,
-              _toggleOvulationReminder,
-              Icons.egg_alt_rounded,
-              indent: true,
-            ),
-            _buildSwitchTile(
-              'Water intake reminder',
-              _settings.waterReminderEnabled,
-              _toggleWaterReminder,
-              Icons.water_drop_rounded,
-              indent: true,
-            ),
-            _buildWaterGoalTile(),
-          ],
+          _buildSwitchTile('Reminders', _settings.remindersEnabled, (v) async {
+            setState(() => _settings.remindersEnabled = v);
+            await CycleRepository.saveSettings(_settings);
+          }, Icons.notifications_outlined),
           const SizedBox(height: 20),
           _sectionTitle('History (${entries.length} entries)'),
           if (entries.isEmpty)
@@ -296,15 +234,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
       );
 
-  Widget _buildSwitchTile(String title, bool value, ValueChanged<bool> onChanged, IconData icon, {bool indent = false}) {
+  Widget _buildSwitchTile(String title, bool value, ValueChanged<bool> onChanged, IconData icon) {
     return Container(
-      margin: EdgeInsets.only(bottom: 8, left: indent ? 16 : 0),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        secondary: Icon(icon, color: indent ? AppColors.secondary : AppColors.primary, size: indent ? 20 : 24),
-        title: Text(title, style: indent ? const TextStyle(fontSize: 14) : null),
+        secondary: Icon(icon, color: AppColors.primary),
+        title: Text(title),
         value: value,
         activeColor: AppColors.primary,
         onChanged: onChanged,
@@ -312,29 +250,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildWaterGoalTile() {
-    final liters = (_settings.waterGoalMl / 1000).toStringAsFixed(1);
+  Widget _buildNavTile(String title, IconData icon, VoidCallback onTap) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8, left: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: [
-          Icon(Icons.local_drink_outlined, color: AppColors.secondary, size: 20),
-          const SizedBox(width: 16),
-          Expanded(child: Text('Daily water goal', style: const TextStyle(fontSize: 14))),
-          IconButton(
-            onPressed: () => _adjustWaterGoal(-250),
-            icon: Icon(Icons.remove_circle_outline_rounded, color: AppColors.textSecondary),
-            visualDensity: VisualDensity.compact,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, color: AppColors.primary),
+                const SizedBox(width: 16),
+                Expanded(child: Text(title)),
+                Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+              ],
+            ),
           ),
-          Text('$liters L', style: const TextStyle(fontWeight: FontWeight.w600)),
-          IconButton(
-            onPressed: () => _adjustWaterGoal(250),
-            icon: Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
+        ),
       ),
     );
   }

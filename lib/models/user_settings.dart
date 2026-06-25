@@ -49,6 +49,22 @@ class UserSettings extends HiveObject {
   @HiveField(11)
   String? email;
 
+  /// Daily water intake goal, in milliliters. Default 2000ml (~8 glasses).
+  @HiveField(12)
+  int waterGoalMl;
+
+  /// Whether to remind the user a few days before their predicted period.
+  @HiveField(13)
+  bool periodReminderEnabled;
+
+  /// Whether to remind the user on their predicted ovulation day.
+  @HiveField(14)
+  bool ovulationReminderEnabled;
+
+  /// Whether to send periodic reminders to log water throughout the day.
+  @HiveField(15)
+  bool waterReminderEnabled;
+
   UserSettings({
     this.onboardingComplete = false,
     this.averageCycleLength = 28,
@@ -62,5 +78,9 @@ class UserSettings extends HiveObject {
     this.profileImagePath,
     this.age,
     this.email,
+    this.waterGoalMl = 2000,
+    this.periodReminderEnabled = true,
+    this.ovulationReminderEnabled = true,
+    this.waterReminderEnabled = false,
   });
 }
