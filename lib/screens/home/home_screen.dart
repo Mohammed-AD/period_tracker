@@ -24,12 +24,16 @@ class _HomeScreenState extends State<HomeScreen> {
   // inside an IndexedStack below, which keeps tabs alive instead of
   // recreating them, so each tab's own initState() only runs once per app
   // session and won't see entries logged afterwards on another tab.
+
+
+
+  final GlobalKey<CalendarScreenState> _calendarKey = GlobalKey<CalendarScreenState>();
   final GlobalKey<InsightsScreenState> _insightsKey = GlobalKey<InsightsScreenState>();
   final GlobalKey<YearlyPatternScreenState> _yearlyKey = GlobalKey<YearlyPatternScreenState>();
   final GlobalKey<TrackersScreenState> _trackersKey = GlobalKey<TrackersScreenState>();
 
   late final List<Widget> _screens = [
-    const CalendarScreen(),
+    CalendarScreen(key: _calendarKey),
     InsightsScreen(key: _insightsKey),
     YearlyPatternScreen(key: _yearlyKey),
     TrackersScreen(key: _trackersKey),
@@ -50,7 +54,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == _currentIndex) return;
     HapticFeedback.selectionClick();
     setState(() => _currentIndex = index);
-    if (index == 1) {
+    if (index == 0) {
+      _calendarKey.currentState?.reload();
+    } else if (index == 1) {
       // Refresh insights every time the tab is opened, so newly logged
       // entries (added while on another tab) are reflected immediately.
       _insightsKey.currentState?.reload();

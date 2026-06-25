@@ -20,11 +20,19 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late UserSettings _settings;
+  final TextEditingController _historySearchController = TextEditingController();
+  String _historySearch = '';
 
   @override
   void initState() {
     super.initState();
     _settings = CycleRepository.getSettings();
+  }
+
+  @override
+  void dispose() {
+    _historySearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _openEditProfile() async {
@@ -116,8 +124,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _adjustWaterGoal(int deltaMl) async {
-    setState(() => _settings.waterGoalMl = (_settings.waterGoalMl + deltaMl).clamp(500, 5000).toInt());
+    setState(() => _settings.waterGoalMl = (_settings.waterGoalMl + deltaMl).clamp(500, 8000).toInt());
     await CycleRepository.saveSettings(_settings);
+  }
+
+  /// Entries matching the current History search text — checked against
+  /// the date (in a couple of common formats), flow, mood, symptoms, and
+  /// notes, so searching "july", "heavy", "cramps", or a note keyword all
+  /// find the right entries.
+  List<dynamic> _filterHistory(List<dynamic> entries) {
+    final query = _historySearch.trim().toLowerCase();
+    if (query.isEmpty) return entries;
+
+    return entries.where((e) {
+      final dateLong = DateFormat('MMM d, yyyy').format(e.startDate).toLowerCase();
+      final dateMonthYear = DateFormat('MMMM yyyy').format(e.startDate).toLowerCase();
+      final flow = (e.flow as String).toLowerCase();
+      final mood = (e.mood as String?)?.toLowerCase() ?? '';
+      final symptoms = (e.symptoms as List<String>).join(' ').toLowerCase();
+      final notes = (e.notes as String?)?.toLowerCase() ?? '';
+
+      return dateLong.contains(query) ||
+          dateMonthYear.contains(query) ||
+          flow.contains(query) ||
+          mood.contains(query) ||
+          symptoms.contains(query) ||
+          notes.contains(query);
+    }).toList();
   }
 
   @override
@@ -171,15 +204,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
           const SizedBox(height: 20),
           _sectionTitle('History (${entries.length} entries)'),
+          if (entries.isNotEmpty) _buildHistorySearchBar(),
           if (entries.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text('No periods logged yet.', style: TextStyle(color: AppColors.textSecondary)),
             )
           else
-            ...entries.map((e) => _buildHistoryTile(e)),
+            _buildHistoryList(entries),
         ],
       ),
+    );
+  }
+
+  Widget _buildHistorySearchBar() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: _historySearchController,
+        onChanged: (value) => setState(() => _historySearch = value),
+        decoration: InputDecoration(
+          hintText: 'Search by date, flow, mood, symptom...',
+          prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSecondary),
+          suffixIcon: _historySearch.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                  onPressed: () {
+                    _historySearchController.clear();
+                    setState(() => _historySearch = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: AppColors.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        ),
+      ),
+    );
+  }
+
+  /// Shows the 5 most recent entries when there's no search text. As soon
+  /// as the person types something, every matching entry is shown (no
+  /// cap) — that's the whole point of letting them search for older ones
+  /// instead of scrolling.
+  Widget _buildHistoryList(List<dynamic> entries) {
+    final filtered = _filterHistory(entries);
+    final isSearching = _historySearch.trim().isNotEmpty;
+    final visible = isSearching ? filtered : filtered.take(5).toList();
+
+    if (filtered.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text('No entries match "$_historySearch".', style: TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+
+    return Column(
+      children: [
+        ...visible.map((e) => _buildHistoryTile(e)),
+        if (!isSearching && entries.length > 5)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              'Showing 5 most recent · search above to find older entries',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
     );
   }
 
