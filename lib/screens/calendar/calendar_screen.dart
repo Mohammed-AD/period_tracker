@@ -18,10 +18,10 @@ class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
   @override
-  State<CalendarScreen> createState() => _CalendarScreenState();
+  State<CalendarScreen> createState() => CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   late List<CycleEntry> _entries;
@@ -40,6 +40,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _refresh() {
+    setState(() => _loadData());
+  }
+
+  /// Called from HomeScreen whenever this tab is reselected — picks up
+  /// anything that could have changed on another tab since this screen
+  /// last rebuilt (new/edited entries, but also settings like a renamed
+  /// profile, since the greeting reads settings.userName directly).
+  void reload() {
+    if (!mounted) return;
     setState(() => _loadData());
   }
 
