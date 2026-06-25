@@ -2,12 +2,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../models/user_settings.dart';
-import '../../services/cycle_repository.dart';
-import '../../services/auth_service.dart';
-import '../../services/profile_image_service.dart';
-import '../../theme/app_theme.dart';
-import '../lock/change_pin_screen.dart';
+import 'package:bloom_cycle/models/user_settings.dart';
+import 'package:bloom_cycle/services/cycle_repository.dart';
+import 'package:bloom_cycle/services/profile_image_service.dart';
+import 'package:bloom_cycle/theme/app_theme.dart';
+import 'package:bloom_cycle/screens/lock/change_pin_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -135,6 +134,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     Navigator.of(context).pop(true);
   }
 
+  Future<void> _openChangePinScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChangePinScreen()),
+    );
+  }
+
+  Widget _buildChangePinTile() {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: _openChangePinScreen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.lock_reset_rounded, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Change PIN',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('Update your 4-digit app lock PIN',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   ImageProvider? _avatarImage() {
     if (_photoPath == null || _photoPath!.isEmpty) return null;
     if (kIsWeb) return NetworkImage(_photoPath!);
@@ -225,33 +271,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 28),
-          if (AuthService.loggedInViaBiometric) ...[
-            Text('Security', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ChangePinScreen(),
-                  ),
-                );
-              },
-              icon: Icon(Icons.lock_reset_rounded, color: AppColors.primary),
-              label: const Text('Change PIN'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "You're signed in with biometrics, so you can set a new PIN directly.",
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
+          Divider(color: AppColors.divider),
+          const SizedBox(height: 16),
+          Text('Security', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
+          _buildChangePinTile(),
         ],
       ),
     );

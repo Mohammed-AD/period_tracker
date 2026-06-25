@@ -22,6 +22,10 @@ class AuthService {
   static const String _pinKey = 'app_lock_pin';
   static final LocalAuthentication _localAuth = LocalAuthentication();
 
+  /// True if the user authenticated via biometrics in this session.
+  /// Reset to false on PIN-based login.
+  static bool loggedInViaBiometric = false;
+
   static Box? _box;
 
   /// Must be called once during app init (after Hive.initFlutter()),

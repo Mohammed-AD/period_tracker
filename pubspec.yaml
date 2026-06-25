@@ -47,6 +47,11 @@ dependencies:
   uuid: ^4.4.0
   percent_indicator: ^4.2.3
 
+  # Local reminders (period, ovulation, water intake) — purely on-device,
+  # scheduled notifications, no push/server involved.
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

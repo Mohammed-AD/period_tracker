@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:table_calendar/table_calendar.dart';
+import 'package:percent_indicator/percent_indicator.dart';
 import 'package:intl/intl.dart';
 import '../../models/cycle_entry.dart';
 import '../../services/cycle_repository.dart';
 import '../../services/cycle_analyzer.dart';
+import '../../services/reminder_scheduler.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/cycle_wheel.dart';
+import '../../widgets/glass_card.dart';
 import '../log_entry/log_entry_screen.dart';
 
 enum _DayPhase { period, predictedPeriod, fertile, ovulation, none }
@@ -113,6 +118,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
             children: [
               _buildHeader(cycleDay),
               const SizedBox(height: 20),
+              _buildCycleWheelCard(cycleDay),
+              const SizedBox(height: 16),
+              _buildProgressRingsRow(cycleDay),
+              const SizedBox(height: 16),
+              _buildFertileWindowSummary(),
+              const SizedBox(height: 16),
+              _buildClearMonthButton(),
+              const SizedBox(height: 12),
               _buildCalendarCard(),
               const SizedBox(height: 16),
               _buildLegend(),
@@ -124,6 +137,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          HapticFeedback.mediumImpact();
           final result = await Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => LogEntryScreen(initialDate: _selectedDay ?? today)),
           );
@@ -167,6 +181,252 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  Widget _buildCycleWheelCard(int? cycleDay) {
+    final settings = CycleRepository.getSettings();
+    final lastEntry = _entries.isNotEmpty ? _entries.first : null;
+
+    int? fertileStartDay;
+    int? fertileEndDay;
+    int? ovulationDay;
+
+    if (lastEntry != null) {
+      final fertile = _analyzer.fertileWindow;
+      final ovulation = _analyzer.predictedOvulationDate;
+      if (fertile != null) {
+        fertileStartDay = fertile.start.difference(lastEntry.startDate).inDays + 1;
+        fertileEndDay = fertile.end.difference(lastEntry.startDate).inDays + 1;
+      }
+      if (ovulation != null) {
+        ovulationDay = ovulation.difference(lastEntry.startDate).inDays + 1;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: Center(
+        child: CycleWheel(
+          currentCycleDay: cycleDay,
+          cycleLength: settings.averageCycleLength,
+          periodLength: settings.averagePeriodLength,
+          fertileStartDay: fertileStartDay,
+          fertileEndDay: fertileEndDay,
+          ovulationDay: ovulationDay,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressRingsRow(int? cycleDay) {
+    final settings = CycleRepository.getSettings();
+    final lastEntry = _entries.isNotEmpty ? _entries.first : null;
+
+    double periodProgress = 0;
+    String periodLabel = 'No period logged';
+    if (cycleDay != null && lastEntry != null && lastEntry.isOngoing) {
+      periodProgress = (cycleDay / settings.averagePeriodLength).clamp(0.0, 1.0);
+      periodLabel = 'Day $cycleDay of ~${settings.averagePeriodLength}';
+    } else if (cycleDay != null) {
+      periodLabel = 'Day $cycleDay of cycle';
+    }
+
+    double fertileProgress = 0;
+    String fertileLabel = 'Not in fertile window';
+    final fertile = _analyzer.fertileWindow;
+    if (fertile != null) {
+      final today = DateTime.now();
+      final totalDays = fertile.end.difference(fertile.start).inDays + 1;
+      if (fertile.contains(today)) {
+        final elapsed = DateTime(today.year, today.month, today.day)
+                .difference(DateTime(fertile.start.year, fertile.start.month, fertile.start.day))
+                .inDays +
+            1;
+        fertileProgress = (elapsed / totalDays).clamp(0.0, 1.0);
+        fertileLabel = 'Day $elapsed of $totalDays fertile';
+      } else if (today.isBefore(fertile.start)) {
+        final daysUntil = fertile.start.difference(today).inDays;
+        fertileLabel = 'Starts in $daysUntil ${daysUntil == 1 ? "day" : "days"}';
+      }
+    }
+
+    return Row(
+      children: [
+        Expanded(child: _ringStat(
+          percent: periodProgress,
+          color: AppColors.periodColor,
+          icon: Icons.water_drop_rounded,
+          label: periodLabel,
+        )),
+        const SizedBox(width: 12),
+        Expanded(child: _ringStat(
+          percent: fertileProgress,
+          color: AppColors.fertileColor,
+          icon: Icons.eco_rounded,
+          label: fertileLabel,
+        )),
+      ],
+    );
+  }
+
+  Widget _ringStat({required double percent, required Color color, required IconData icon, required String label}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18)),
+      child: Row(
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: percent),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => CircularPercentIndicator(
+              radius: 26,
+              lineWidth: 6,
+              percent: value,
+              animation: false,
+              circularStrokeCap: CircularStrokeCap.round,
+              backgroundColor: AppColors.divider,
+              progressColor: color,
+              center: Icon(icon, size: 16, color: color),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFertileWindowSummary() {
+    final fertile = _analyzer.fertileWindow;
+    final ovulation = _analyzer.predictedOvulationDate;
+
+    if (fertile == null || ovulation == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppColors.cardBackground, borderRadius: BorderRadius.circular(16)),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: AppColors.textSecondary, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Log at least one period to see your predicted fertile window.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final rangeStr =
+        '${DateFormat('MMM d').format(fertile.start)} – ${DateFormat('MMM d').format(fertile.end)}';
+    final ovulationStr = DateFormat('MMM d').format(ovulation);
+
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      gradientColors: [AppColors.fertileColorLight.withOpacity(0.8), AppColors.fertileColorLight.withOpacity(0.4)],
+      borderRadius: 18,
+      blurSigma: 10,
+      child: Row(
+        children: [
+          Icon(Icons.eco_rounded, color: AppColors.fertileColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fertile window: $rangeStr',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Predicted ovulation around $ovulationStr',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClearMonthButton() {
+    final monthLabel = DateFormat('MMMM yyyy').format(_focusedDay);
+    final count = CycleRepository.getEntriesForMonth(_focusedDay).length;
+    if (count == 0) return const SizedBox.shrink();
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        onPressed: () => _clearMonth(_focusedDay),
+        icon: Icon(Icons.delete_sweep_outlined, size: 18, color: AppColors.concern),
+        label: Text(
+          'Clear $monthLabel ($count)',
+          style: TextStyle(color: AppColors.concern, fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+      ),
+    );
+  }
+
+  /// Deletes every period entry whose start date falls in [month] — scoped
+  /// strictly to whichever month is currently shown on the calendar, never
+  /// to all saved data. The confirmation names the exact month and count
+  /// so there's no ambiguity about what's about to be removed.
+  Future<void> _clearMonth(DateTime month) async {
+    final monthLabel = DateFormat('MMMM yyyy').format(month);
+    final entries = CycleRepository.getEntriesForMonth(month);
+    if (entries.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text('Clear $monthLabel?'),
+        content: Text(
+          'This will permanently delete ${entries.length} period ${entries.length == 1 ? "entry" : "entries"} '
+          'logged in $monthLabel. Other months are not affected. This can\'t be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Delete', style: TextStyle(color: AppColors.concern, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final deletedCount = await CycleRepository.deleteEntriesForMonth(month);
+    HapticFeedback.mediumImpact();
+
+    try {
+      await ReminderScheduler.rescheduleAll(CycleRepository.getAllEntries());
+    } catch (_) {
+      // Non-fatal — reminders are a side effect, see ReminderScheduler docs.
+    }
+
+    if (mounted) {
+      _refresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Deleted $deletedCount ${deletedCount == 1 ? "entry" : "entries"} from $monthLabel.')),
+      );
+    }
+  }
+
   Widget _buildCalendarCard() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -181,12 +441,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
         focusedDay: _focusedDay,
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         onDaySelected: (selected, focused) {
+          HapticFeedback.selectionClick();
           setState(() {
             _selectedDay = selected;
             _focusedDay = focused;
           });
         },
-        onPageChanged: (focused) => _focusedDay = focused,
+        onPageChanged: (focused) => setState(() => _focusedDay = focused),
         headerStyle: HeaderStyle(
           formatButtonVisible: false,
           titleCentered: true,

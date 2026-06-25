@@ -426,7 +426,7 @@ class YearlyPatternScreenState extends State<YearlyPatternScreen> {
                 // that exist.
                 minX: 0,
                 maxX: 11,
-                minY: (dataMin - pad).clamp(0, double.infinity),
+                minY: (dataMin - pad).clamp(0.0, double.infinity),
                 maxY: dataMax + pad,
                 gridData: FlGridData(
                   show: true,

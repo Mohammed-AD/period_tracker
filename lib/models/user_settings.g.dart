@@ -30,13 +30,19 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       profileImagePath: fields[9] as String?,
       age: fields[10] as int?,
       email: fields[11] as String?,
+      // Fields 12-15 added with the trackers/reminders update — older
+      // records won't have them, default sensibly so nothing crashes.
+      waterGoalMl: fields[12] as int? ?? 2000,
+      periodReminderEnabled: fields[13] as bool? ?? true,
+      ovulationReminderEnabled: fields[14] as bool? ?? true,
+      waterReminderEnabled: fields[15] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.onboardingComplete)
       ..writeByte(1)
@@ -60,7 +66,15 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(10)
       ..write(obj.age)
       ..writeByte(11)
-      ..write(obj.email);
+      ..write(obj.email)
+      ..writeByte(12)
+      ..write(obj.waterGoalMl)
+      ..writeByte(13)
+      ..write(obj.periodReminderEnabled)
+      ..writeByte(14)
+      ..write(obj.ovulationReminderEnabled)
+      ..writeByte(15)
+      ..write(obj.waterReminderEnabled);
   }
 
   @override

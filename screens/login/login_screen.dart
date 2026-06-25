@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import '../../services/auth_service.dart';
-import '../../services/cycle_repository.dart';
-import '../../theme/app_theme.dart';
-import '../home/home_screen.dart';
+import 'package:bloom_cycle/services/auth_service.dart';
+import 'package:bloom_cycle/services/cycle_repository.dart';
+import 'package:bloom_cycle/theme/app_theme.dart';
+import 'package:bloom_cycle/screens/home/home_screen.dart';
 
 /// Shown every time a registered user reopens the app (if lock is enabled).
 /// PIN entry plus a visible fingerprint/biometric icon button.
@@ -53,10 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await AuthService.authenticateWithBiometrics();
     if (!mounted) return;
     setState(() => _checkingBiometric = false);
-    if (success) {
-      AuthService.loggedInViaBiometric = true;
-      _goHome();
-    }
+    if (success) _goHome();
   }
 
   void _goHome() {
@@ -68,7 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _onPinCompleted(String pin) async {
     final valid = await AuthService.verifyPin(pin);
     if (valid) {
-      AuthService.loggedInViaBiometric = false;
       _goHome();
     } else {
       setState(() => _error = 'Incorrect PIN — try again');
