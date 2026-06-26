@@ -2,28 +2,33 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/cycle_entry.dart';
 import '../services/cycle_analyzer.dart';
-
-/// ChatbotService — sends user message + full cycle context to the
-/// Render backend, which injects it into the AI's system prompt.
+ 
 class ChatbotService {
   static const String _baseUrl = 'https://be-chatbot-jozi.onrender.com';
   static const String _chatEndpoint = '$_baseUrl/chat';
-
+ 
   static const List<String> _fallbackRoutes = [
     '$_baseUrl/api/chat',
     '$_baseUrl/message',
     '$_baseUrl/api/message',
   ];
-
+ 
   static String? _workingEndpoint;
-
-  // ── Conversation history (in-memory, per session) ──────────────
-  // Each entry: { "role": "user"/"assistant", "content": "..." }
   static final List<Map<String, String>> _history = [];
-
-  /// Clears conversation history (e.g. on logout or new session).
+ 
   static void clearHistory() => _history.clear();
-
+ 
+  // ── Render cold start ke liye server wake karo ─────────────────
+  static Future<void> _wakeServer() async {
+    try {
+      await http
+          .get(Uri.parse('$_baseUrl/health'))
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Silently ignore — sirf wake karna tha
+    }
+  }
+ 
   // ──────────────────────────────────────────────────────────────
   //  PUBLIC: sendMessage
   // ──────────────────────────────────────────────────────────────
@@ -31,13 +36,13 @@ class ChatbotService {
     required String userMessage,
     required List<CycleEntry> cycleHistory,
   }) async {
+    _wakeServer(); // await mat karo — background mein chale
     final context = _buildContext(cycleHistory);
-
-    // Add user turn to local history before sending
+ 
     _history.add({'role': 'user', 'content': userMessage.trim()});
-
+ 
     String reply;
-
+ 
     if (_workingEndpoint != null) {
       reply = await _postToEndpoint(
         _workingEndpoint!, userMessage, context, _history,
@@ -45,22 +50,20 @@ class ChatbotService {
     } else {
       reply = await _tryEndpoints(userMessage, context);
     }
-
-    // Add assistant reply to history so next turn has context
+ 
     _history.add({'role': 'assistant', 'content': reply});
-
-    // Keep history bounded (last 20 turns = 10 exchanges)
+ 
     if (_history.length > 20) {
       _history.removeRange(0, _history.length - 20);
     }
-
+ 
     return reply;
   }
-
+ 
   // ──────────────────────────────────────────────────────────────
   //  PRIVATE HELPERS
   // ──────────────────────────────────────────────────────────────
-
+ 
   static Future<String> _tryEndpoints(
     String userMessage,
     Map<String, dynamic> context,
@@ -81,12 +84,10 @@ class ChatbotService {
         break;
       }
     }
-    // Remove the user turn we added (since we're going offline)
     if (_history.isNotEmpty) _history.removeLast();
     return _offlineFallback(userMessage, []);
   }
-
-  /// HTTP POST — sends message, context, and conversation history.
+ 
   static Future<String> _postToEndpoint(
     String url,
     String userMessage,
@@ -102,14 +103,14 @@ class ChatbotService {
           },
           body: jsonEncode({
             'message': userMessage,
-            'context': context,       // ← cycle data for system prompt
-            'history': history,       // ← past turns for multi-turn chat
+            'context': context,
+            'history': history,
           }),
         )
-        .timeout(const Duration(seconds: 30));
-
+        .timeout(const Duration(seconds: 60)); // ← 30 se 60 kiya
+ 
     if (response.statusCode == 404) throw _EndpointNotFoundException();
-
+ 
     if (response.statusCode == 200) {
       try {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -125,34 +126,25 @@ class ChatbotService {
         return "Got an empty response from the server. Please try again.";
       }
     }
-
+ 
     return '⚠️ Server returned error ${response.statusCode}. Please try again.';
   }
-
+ 
   // ──────────────────────────────────────────────────────────────
-  //  CONTEXT BUILDER — richer medical context
+  //  CONTEXT BUILDER
   // ──────────────────────────────────────────────────────────────
   static Map<String, dynamic> _buildContext(List<CycleEntry> entries) {
     final analyzer = CycleAnalyzer(entries);
     final predicted = analyzer.predictedNextPeriodStart;
-
+ 
     return {
-      // Cycle stats
       'averageCycleLength': analyzer.averageCycleLength?.round(),
       'averagePeriodLength': analyzer.averagePeriodLength?.round(),
-
-      // Last period info
       'lastPeriodStart': entries.isNotEmpty
           ? entries.first.startDate.toIso8601String()
           : null,
-
-      // Prediction (ISO string or null)
       'predictedNextPeriod': predicted?.toIso8601String(),
-
-      // Recent symptoms from last logged entry
       'recentSymptoms': entries.isNotEmpty ? entries.first.symptoms : [],
-
-      // How many cycles logged (gives AI a sense of data quality)
       'cyclesLogged': entries.length,
     };
   }
