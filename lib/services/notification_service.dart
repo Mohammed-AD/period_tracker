@@ -64,6 +64,11 @@ class NotificationService {
       const InitializationSettings(android: androidInit, iOS: iosInit),
     );
     _initialized = true;
+    // Request runtime notification permission right after init —
+    // without this, Android 13+/iOS never prompt the user and every
+    // zonedSchedule() call below silently no-ops.
+     
+     await requestPermission();
   }
 
   /// Requests OS-level notification permission. Returns true if granted

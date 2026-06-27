@@ -2,6 +2,7 @@
     <!-- Required for local_auth to show the system biometric (fingerprint /
          face) prompt. Without this, biometric authentication silently
          fails on most devices. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- Required for image_picker's camera capture option (profile photo).
          Gallery selection uses the system photo picker on modern Android
